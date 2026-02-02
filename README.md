@@ -7,7 +7,7 @@ Single-file Python market assistant for NSE intraday analysis.
 - Numeric chart analysis (EMA, RSI, ATR, volume)
 - Portfolio-aware decision engine
 - News risk analysis using pretrained FinBERT (local)
-- WhatsApp alerts via Twilio
+- Telegram notification
 - No agents, no frameworks, no cloud LLMs
 
 ## Setup
