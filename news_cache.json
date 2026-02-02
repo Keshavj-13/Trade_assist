@@ -1,0 +1,30 @@
+{
+  "GMRAIRPORT": {
+    "timestamp": "2026-02-02T12:04:59Z",
+    "headlines": []
+  },
+  "HINDPETRO": {
+    "timestamp": "2026-02-02T12:05:00Z",
+    "headlines": []
+  },
+  "BPCL": {
+    "timestamp": "2026-02-02T12:05:02Z",
+    "headlines": [
+      "Reliance to gain as Trump signals resumption of India\u2013Venezuela oil trade",
+      "Corporate Actions This Week: ITC, Nestle, NTPC Interim Dividends",
+      "BPCL, Trafigura sign crude oil supply agreement",
+      "Adnoc Gas, TotalEnergies, Gunvor in fray for BPCL's \u20b935,000-crore LNG contract",
+      "BPCL Plans Singapore Trading Hub To Cut Costs And Boost Margins"
+    ]
+  },
+  "CANBK": {
+    "timestamp": "2026-02-02T12:05:03Z",
+    "headlines": []
+  },
+  "NATIONALUM": {
+    "timestamp": "2026-02-02T12:05:04Z",
+    "headlines": [
+      "F&O Talk | Nifty holds 100-day EMA: Breather before rally or calm before the storm? Sudeep Shah answers"
+    ]
+  }
+}
