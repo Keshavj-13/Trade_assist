@@ -4,10 +4,11 @@ Telegram send and receive logic.
 
 import requests
 from infra.logging import log
-from config.settings import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+from config.settings import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TOP_N
 from infra.database import record_position, update_position, get_open_positions
 from datetime import datetime
 from core.data_fetch import fetch_data
+from service.research import perform_scan, persist_scan_results, format_summary_text
 
 def notify(symbol, action, confidence, price, timestamp):
     # Moved from market_assistant.py
@@ -77,4 +78,20 @@ def parse_command(text):
         positions = get_open_positions()
         msg = "Open Positions:\n" + "\n".join([f"{p['symbol']}: qty={p['qty']} price={p['price']}" for p in positions])
         return msg
+    elif cmd == '/research':
+        scope_arg = parts[1].lower() if len(parts) > 1 else "w"
+        if scope_arg.startswith("p"):
+            scope = "portfolio"
+        else:
+            scope = "whole"
+        limit = None
+        if len(parts) > 2:
+            try:
+                limit = int(parts[2])
+            except ValueError:
+                log.warning(f"Invalid /research limit {parts[2]}, falling back to TOP_N")
+        top_n = limit if limit and limit > 0 else TOP_N
+        scan_result = perform_scan(scope=scope, top_n=top_n)
+        persist_scan_results(scan_result)
+        return format_summary_text(scan_result)
     return "Unknown command."

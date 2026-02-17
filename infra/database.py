@@ -39,34 +39,42 @@ def initialize_db():
 def record_position(symbol, qty, price, timestamp):
     conn = _get_conn()
     c = conn.cursor()
+    symbol_key = symbol.upper()
     c.execute('REPLACE INTO positions (symbol, qty, price, timestamp) VALUES (?, ?, ?, ?)',
-              (symbol, qty, price, timestamp))
+              (symbol_key, qty, price, timestamp))
     conn.commit()
     conn.close()
-    log.info(f"Position recorded: {symbol} qty={qty} price={price} @ {timestamp}")
+    log.info(f"Position recorded: {symbol_key} qty={qty} price={price} @ {timestamp}")
 
 def update_position(symbol, qty_delta, price, timestamp):
     conn = _get_conn()
     c = conn.cursor()
-    c.execute('SELECT qty FROM positions WHERE symbol=?', (symbol,))
+    symbol_key = symbol.upper()
+    c.execute('SELECT qty FROM positions WHERE symbol=?', (symbol_key,))
     row = c.fetchone()
     new_qty = qty_delta
     if row:
         new_qty += row['qty']
     if new_qty == 0:
-        c.execute('DELETE FROM positions WHERE symbol=?', (symbol,))
+        c.execute('DELETE FROM positions WHERE symbol=?', (symbol_key,))
     else:
         c.execute('REPLACE INTO positions (symbol, qty, price, timestamp) VALUES (?, ?, ?, ?)',
-                  (symbol, new_qty, price, timestamp))
+                  (symbol_key, new_qty, price, timestamp))
     conn.commit()
     conn.close()
-    log.info(f"Position updated: {symbol} qty_delta={qty_delta} price={price} @ {timestamp}")
+    log.info(f"Position updated: {symbol_key} qty_delta={qty_delta} price={price} @ {timestamp}")
 
 def get_open_positions():
     conn = _get_conn()
     c = conn.cursor()
     c.execute('SELECT symbol, qty, price, timestamp FROM positions')
-    positions = [dict(row) for row in c.fetchall()]
+    positions = []
+    for row in c.fetchall():
+        entry = dict(row)
+        sym = entry.get('symbol')
+        if isinstance(sym, str):
+            entry['symbol'] = sym.upper()
+        positions.append(entry)
     conn.close()
     log.info(f"Fetched open positions: {positions}")
     return positions
