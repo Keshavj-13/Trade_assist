@@ -14,7 +14,7 @@ def start_service():
 def run_once():
     log.info("Running market scan (runner.run_once)")
     scan_result = perform_scan(scope="whole")
-    persist_scan_results(scan_result)
+    persist_scan_results(scan_result, username="system")
     timestamp = scan_result.get("timestamp")
     if not timestamp:
         timestamp = "unknown"

@@ -4,56 +4,48 @@ News fetching and FinBERT sentiment analysis.
 
 import time
 import os
-from datetime import datetime, timedelta
 import requests
-from infra.logging import log
+from typing import Dict, List
 
-# In-memory cache: { symbol: { 'ts': epoch, 'headlines': [...] } }
+from infra.logging import log
+from infra.database import fetch_news_cache, upsert_news_cache
 from config import settings as cfg
 
-_news_cache = {}
+_news_cache: Dict[str, Dict] = {}
 _NEWS_TTL_SECONDS = int(os.environ.get("NEWS_TTL_SECONDS", 45 * 60))
 _NEWS_PAGE_SIZE = 5
 
-# load persistent cache if present
-try:
-    if hasattr(cfg, 'NEWS_CACHE_FILE') and os.path.exists(cfg.NEWS_CACHE_FILE):
-        with open(cfg.NEWS_CACHE_FILE, 'r') as _f:
-            import json
-            _news_cache = json.load(_f)
-            # normalize ts to float epoch if stored as ISO
-            for k, v in list(_news_cache.items()):
-                ts = v.get('ts') or v.get('timestamp')
-                if isinstance(ts, str):
-                    try:
-                        # try parse ISO
-                        from datetime import datetime as _dt
-                        _news_cache[k]['ts'] = _dt.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").timestamp()
-                    except Exception:
-                        try:
-                            _news_cache[k]['ts'] = float(ts)
-                        except Exception:
-                            _news_cache[k]['ts'] = 0
-                else:
-                    _news_cache[k]['ts'] = ts or 0
-except Exception:
-    _news_cache = {}
+
+def _cache_from_db(symbol: str):
+    rows = fetch_news_cache(symbol)
+    if not rows:
+        return None
+    headlines = [row["headline"] for row in rows if row["headline"]]
+    fetched_at = max((row["fetched_at"] or 0) for row in rows)
+    entry = {"ts": fetched_at, "headlines": headlines}
+    _news_cache[symbol] = entry
+    return entry
+
+
+def _cache_to_memory(symbol: str, headlines: List[str], ts: float):
+    entry = {"ts": ts, "headlines": headlines}
+    _news_cache[symbol] = entry
+    return entry
+
 
 def fetch_news(symbol):
-    from config import settings as cfg
     key = cfg.NEWS_API_KEY
     if not key:
         log.warning("NEWS_API_KEY not set, skipping news fetch.")
-        return []
+        cached = _cache_from_db(symbol)
+        return cached["headlines"] if cached else []
 
     now = time.time()
-    entry = _news_cache.get(symbol)
-    if entry:
-        age = now - entry.get("ts", 0)
-        if age < _NEWS_TTL_SECONDS:
-            headlines = entry.get("headlines", [])
-            log.info(f"Reusing cached news for {symbol} ({len(headlines)} articles)")
-            return headlines
+    cached = _news_cache.get(symbol) or _cache_from_db(symbol)
+    if cached and now - cached.get("ts", 0) < _NEWS_TTL_SECONDS:
+        headlines = cached.get("headlines", [])
+        log.info(f"Reusing cached news for {symbol} ({len(headlines)} articles)")
+        return headlines
 
     url = "https://newsapi.org/v2/everything"
     params = {
@@ -61,7 +53,7 @@ def fetch_news(symbol):
         "apiKey": key,
         "pageSize": _NEWS_PAGE_SIZE,
         "sortBy": "publishedAt",
-        "language": "en"
+        "language": "en",
     }
     try:
         r = requests.get(url, params=params, timeout=10)
@@ -69,26 +61,40 @@ def fetch_news(symbol):
         data = r.json()
         articles = data.get("articles", []) if isinstance(data, dict) else []
         headlines = []
-        for a in articles:
-            t = a.get("title")
-            if t:
-                headlines.append(t)
+        entries = []
+        for article in articles:
+            title = article.get("title")
+            if not title:
+                continue
+            headlines.append(title)
+            entries.append(
+                {
+                    "title": title,
+                    "source": article.get("source", {}).get("name"),
+                    "published_at": article.get("publishedAt"),
+                    "score": None,
+                }
+            )
             if len(headlines) >= _NEWS_PAGE_SIZE:
                 break
-        _news_cache[symbol] = {"ts": now, "headlines": headlines}
-        # persist cache
-        try:
-            import json
-            if hasattr(cfg, 'NEWS_CACHE_FILE'):
-                with open(cfg.NEWS_CACHE_FILE, 'w') as _f:
-                    json.dump(_news_cache, _f, indent=2)
-        except Exception:
-            log.error("Failed to persist news cache", exc_info=True)
+        _cache_to_memory(symbol, headlines, now)
+        if entries:
+            try:
+                upsert_news_cache(symbol, entries)
+            except Exception:
+                log.error("Failed to persist news cache", exc_info=True)
         log.info(f"Fetched fresh news for {symbol} ({len(headlines)} articles)")
         return headlines
-    except Exception as e:
-        log.error(f"Failed to fetch news for {symbol}: {e}", exc_info=True)
-        return []
+    except requests.exceptions.HTTPError as exc:
+        log.error(f"Failed to fetch news for {symbol}: {exc}", exc_info=True)
+        if exc.response.status_code == 429:
+            log.warning("NewsAPI rate limited; reusing cache if available.")
+        cached = _cache_from_db(symbol)
+        return cached["headlines"] if cached else []
+    except Exception as exc:
+        log.error(f"Failed to fetch news for {symbol}: {exc}", exc_info=True)
+        cached = _cache_from_db(symbol)
+        return cached["headlines"] if cached else []
 
 
 def finbert_sentiment(headlines):

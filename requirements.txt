@@ -7,3 +7,5 @@ torch
 twilio
 python-dotenv
 matplotlib
+streamlit
+requests-cache

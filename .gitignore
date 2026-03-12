@@ -6,3 +6,10 @@ portfolio.json
 venv/
 .env
 logs/
+data/analysis/
+data/*.db
+data/news_cache.json
+data/users.json
+data/rl_qtable.json
+data/yfinance_cache/
+frontend_node/node_modules/

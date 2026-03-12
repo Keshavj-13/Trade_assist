@@ -8,7 +8,10 @@ from config.settings import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TOP_N
 from infra.database import record_position, update_position, get_open_positions
 from datetime import datetime
 from core.data_fetch import fetch_data
+from infra.user_store import ensure_user, get_wallet, update_wallet
 from service.research import perform_scan, persist_scan_results, format_summary_text
+
+ensure_user("telegram")
 
 def notify(symbol, action, confidence, price, timestamp):
     # Moved from market_assistant.py
@@ -53,7 +56,7 @@ def parse_command(text):
                 log.error(f"Error fetching price for {symbol}: {e}", exc_info=True)
                 price = 0.0
         timestamp = datetime.utcnow().isoformat()
-        record_position(symbol, qty, price, timestamp)
+        record_position(symbol, qty, price, timestamp, username="telegram")
         return f"Recorded BUY: {symbol} qty={qty} price={price}"
     elif cmd == '/sold' and len(parts) >= 3:
         symbol = parts[1].upper()
@@ -72,7 +75,7 @@ def parse_command(text):
                 log.error(f"Error fetching price for {symbol}: {e}", exc_info=True)
                 price = 0.0
         timestamp = datetime.utcnow().isoformat()
-        update_position(symbol, -qty, price, timestamp)
+        update_position(symbol, -qty, price, timestamp, username="telegram")
         return f"Recorded SELL: {symbol} qty={qty} price={price}"
     elif cmd == '/positions':
         positions = get_open_positions()
@@ -91,7 +94,15 @@ def parse_command(text):
             except ValueError:
                 log.warning(f"Invalid /research limit {parts[2]}, falling back to TOP_N")
         top_n = limit if limit and limit > 0 else TOP_N
-        scan_result = perform_scan(scope=scope, top_n=top_n)
-        persist_scan_results(scan_result)
+        wallet = get_wallet("telegram")
+        scan_result = perform_scan(scope=scope, top_n=top_n, wallet=wallet)
+        persist_scan_results(scan_result, username="telegram")
         return format_summary_text(scan_result)
+    elif cmd == '/update_wallet' and len(parts) >= 2:
+        try:
+            amount = float(parts[1])
+        except ValueError:
+            return "Invalid amount. Use `/update_wallet 1000`."
+        update_wallet("telegram", amount)
+        return f"Wallet updated to ₹{amount:,.2f}"
     return "Unknown command."

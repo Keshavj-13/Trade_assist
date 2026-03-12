@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Market Assistant Control Room</title>
+  <style>
+    :root {
+      font-family: "Inter", system-ui, sans-serif;
+      background: #030616;
+      color: #f8fbff;
+    }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #1c2b55, #030616 55%);
+    }
+
+    .app-shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 24px;
+    }
+
+    .panel {
+      border-radius: 20px;
+      padding: 28px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 25px 55px rgba(3, 6, 22, 0.6);
+    }
+
+    .panel-secondary {
+      background: linear-gradient(180deg, rgba(20, 32, 72, 0.85), rgba(3, 6, 22, 0.95));
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .top-bar h2 {
+      margin: 0;
+      font-size: 32px;
+      letter-spacing: 0.02em;
+    }
+
+    .subtle {
+      color: #9fb0d9;
+      font-size: 0.95rem;
+      margin: 0;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-size: 1rem;
+      font-weight: 600;
+      background: linear-gradient(135deg, #41c7d9, #2870d8);
+      color: #fff;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    input,
+    button,
+    select {
+      border-radius: 10px;
+      border: none;
+      padding: 10px 14px;
+      font-size: 1rem;
+      font-family: inherit;
+    }
+
+    input {
+      background: rgba(255, 255, 255, 0.05);
+      color: #f8fbff;
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .dashboard-card {
+      padding: 16px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(10, 18, 40, 0.8);
+    }
+
+    .dashboard-card strong {
+      display: block;
+      font-size: 1.4rem;
+      margin-top: 4px;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .output-area {
+      margin-bottom: 18px;
+    }
+
+    .output-area pre {
+      background: rgba(2, 9, 30, 0.7);
+      border-radius: 12px;
+      padding: 16px;
+      white-space: pre-wrap;
+      font-size: 0.95rem;
+      color: #e7ecff;
+      min-height: 120px;
+    }
+
+    .log {
+      background: rgba(0, 0, 0, 0.45);
+      border-radius: 12px;
+      padding: 14px;
+      font-size: 0.9rem;
+      color: #c4d2ff;
+      min-height: 100px;
+      margin-top: 12px;
+      overflow-y: auto;
+    }
+
+    .decision-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+    }
+
+    .decision-card {
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 16px;
+      min-height: 160px;
+    }
+
+    .decision-card h4 {
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-size: 1.1rem;
+      color: #b5c2ff;
+    }
+
+    .decision-card ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .decision-card li {
+      padding: 10px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 0.9rem;
+      color: #eff2ff;
+    }
+
+    .graph-wrapper {
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      height: 420px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 16px;
+      color: #9fb0d9;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app-shell">
+    <div class="panel">
+      <div class="top-bar">
+        <div>
+          <h2>Market Assistant</h2>
+          <p class="subtle">Intraday control room • Wallet-aware guardrails</p>
+        </div>
+        <button id="logoutBtn">Log out</button>
+      </div>
+
+      <div id="authSection">
+        <form id="authForm">
+          <div class="input-group">
+            <label>Username</label>
+            <input id="username" placeholder="trader01" required />
+          </div>
+          <div class="input-group">
+            <label>Password</label>
+            <input id="password" type="password" placeholder="••••••••" required />
+          </div>
+          <button type="submit">Log in</button>
+        </form>
+        <p class="subtle" style="margin-top: 12px;">
+          New user? <a id="signupToggle" href="#" style="color:#58b1ff; text-decoration:none;">Create account</a>
+        </p>
+        <div id="signupWrapper" style="display:none;">
+          <form id="signupForm">
+            <div class="input-group">
+              <label>Choose username</label>
+              <input id="signupUsername" placeholder="new trader" />
+            </div>
+            <div class="input-group">
+              <label>Password</label>
+              <input id="signupPassword" type="password" />
+            </div>
+            <div class="input-group">
+              <label>Initial wallet</label>
+              <input id="signupWallet" type="number" value="1000" min="0" />
+            </div>
+            <button type="button" id="signupBtn">Sign up</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="dashboard" style="display:none;">
+        <div class="dashboard-grid">
+          <div class="dashboard-card">
+            <div class="subtle">Available cash</div>
+            <strong id="walletDisplay">₹0</strong>
+          </div>
+          <div class="dashboard-card">
+            <div class="subtle">Last scan</div>
+            <strong id="lastScan">—</strong>
+          </div>
+          <div class="dashboard-card">
+            <div class="subtle">Risk guard</div>
+            <strong>Stop-loss + RL</strong>
+          </div>
+        </div>
+
+        <form id="walletForm" class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px,1fr));">
+          <div class="dashboard-card">
+            <div class="input-group">
+              <label>Wallet balance (₹)</label>
+              <input id="walletInput" type="number" min="0" step="50" />
+            </div>
+            <button type="submit">Set wallet</button>
+          </div>
+        </form>
+
+        <div class="action-row">
+          <button id="runUniverse">Full universe research</button>
+          <button id="runPortfolio">Portfolio-only research</button>
+        </div>
+
+        <div class="output-area">
+          <h3>Decision summary</h3>
+          <pre id="summaryText">No research executed yet.</pre>
+          <div class="log" id="logArea">Awaiting input...</div>
+        </div>
+
+        <div class="decision-grid">
+          <div class="decision-card">
+            <h4>BUY candidates</h4>
+            <ul id="buyList">
+              <li>Results appear here</li>
+            </ul>
+          </div>
+          <div class="decision-card">
+            <h4>SELL candidates</h4>
+            <ul id="sellList">
+              <li>Results appear here</li>
+            </ul>
+          </div>
+          <div class="decision-card">
+            <h4>HOLD overview</h4>
+            <ul id="holdList">
+              <li>No holdings scanned yet</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel panel-secondary">
+      <h3>Live insights</h3>
+      <p class="subtle">Graphs, stop-loss, and RL preferences live here.</p>
+      <div class="graph-wrapper">
+        Graph placeholder (Node UI will expose detailed plots soon)
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const logArea = document.getElementById("logArea");
+    const summaryEl = document.getElementById("summaryText");
+    const walletDisplay = document.getElementById("walletDisplay");
+    const walletInput = document.getElementById("walletInput");
+    const buyList = document.getElementById("buyList");
+    const sellList = document.getElementById("sellList");
+    const holdList = document.getElementById("holdList");
+    const lastScanEl = document.getElementById("lastScan");
+
+    const state = {
+      username: null,
+      wallet: 0,
+    };
+
+    const formatCurrency = (value) => {
+      return "₹" + Number(value || 0).toLocaleString();
+    };
+
+    const appendLog = (text) => {
+      logArea.textContent = text;
+    };
+
+    const setWalletDisplay = (value) => {
+      state.wallet = Number(value || 0);
+      walletDisplay.textContent = formatCurrency(state.wallet);
+      walletInput.value = state.wallet;
+    };
+
+    const showDashboard = () => {
+      document.getElementById("authSection").style.display = "none";
+      document.getElementById("dashboard").style.display = "block";
+      document.getElementById("logoutBtn").style.visibility = "visible";
+    };
+
+    const hideDashboard = () => {
+      document.getElementById("authSection").style.display = "block";
+      document.getElementById("dashboard").style.display = "none";
+      document.getElementById("logoutBtn").style.visibility = "hidden";
+    };
+
+    const renderList = (element, items, fallback) => {
+      if (!items || items.length === 0) {
+        element.innerHTML = `<li>${fallback}</li>`;
+        return;
+      }
+      element.innerHTML = items
+        .map(
+          (entry) =>
+            `<li><strong>${entry.symbol}</strong> @ ${entry.price}${
+              entry.reason ? ` • ${entry.reason}` : ""
+            }</li>`
+        )
+        .slice(0, 6)
+        .join("");
+    };
+
+    document.getElementById("signupToggle").addEventListener("click", (event) => {
+      event.preventDefault();
+      const wrapper = document.getElementById("signupWrapper");
+      wrapper.style.display = wrapper.style.display === "none" ? "block" : "none";
+    });
+
+    document.getElementById("authForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+      if (!username) {
+        appendLog("Username is required.");
+        return;
+      }
+      appendLog("Logging in...");
+      const resp = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        state.username = username;
+        setWalletDisplay(data.wallet);
+        summaryEl.textContent = "Patient zero scan states: waiting for triggers.";
+        appendLog("Logged in. Ready for commands.");
+        lastScanEl.textContent = "Awaiting scan";
+        showDashboard();
+      } else {
+        const err = await resp.json();
+        appendLog(err.message || "Login failed");
+      }
+    });
+
+    document.getElementById("signupBtn").addEventListener("click", async () => {
+      const username = document.getElementById("signupUsername").value.trim();
+      const password = document.getElementById("signupPassword").value;
+      const wallet = Number(document.getElementById("signupWallet").value);
+      if (!username || !password) {
+        appendLog("Username and password required for signup.");
+        return;
+      }
+      appendLog("Creating account...");
+      const resp = await fetch("/api/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, wallet }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        state.username = username;
+        setWalletDisplay(data.wallet);
+        summaryEl.textContent = "New account ready for intraday research.";
+        appendLog("Account created. Logged in automatically.");
+        showDashboard();
+      } else {
+        const err = await resp.json();
+        appendLog(err.message || "Signup failed");
+      }
+    });
+
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      state.username = null;
+      hideDashboard();
+      appendLog("Logged out.");
+    });
+
+    document.getElementById("walletForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!state.username) {
+        appendLog("Log in before adjusting the wallet.");
+        return;
+      }
+      const amount = Number(walletInput.value);
+      appendLog("Updating wallet...");
+      const resp = await fetch("/api/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: state.username, amount }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setWalletDisplay(data.wallet);
+        appendLog("Wallet updated.");
+      } else {
+        const err = await resp.json();
+        appendLog(err.message || "Wallet update failed");
+      }
+    });
+
+    const triggerScan = async (scope) => {
+      const username = state.username || "system";
+      const wallet = state.wallet;
+      appendLog(`Running ${scope} scan...`);
+      const resp = await fetch("/api/research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope, username, wallet }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json();
+        appendLog(err.message || "Scan failed");
+        return;
+      }
+      const result = await resp.json();
+      setWalletDisplay(result.wallet ?? wallet);
+      lastScanEl.textContent = result.market_time || new Date().toLocaleTimeString();
+      summaryEl.textContent = result.summary || "No summary received.";
+      appendLog(`Complete: ${result.buy_candidates.length} BUY / ${result.sell_candidates.length} SELL / ${result.hold_candidates.length} HOLD`);
+      renderList(buyList, result.buy_candidates, "No BUY candidates.");
+      renderList(sellList, result.sell_candidates, "No SELL candidates.");
+      renderList(holdList, (result.hold_candidates || []).map((symbol) => ({ symbol, price: "-", reason: "Held" })), "No HOLD candidates.");
+    };
+
+    document.getElementById("runUniverse").addEventListener("click", () => triggerScan("whole"));
+    document.getElementById("runPortfolio").addEventListener("click", () => triggerScan("portfolio"));
+
+    hideDashboard();
+  </script>
+</body>
+
+</html>
