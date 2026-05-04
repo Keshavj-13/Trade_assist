@@ -1,4 +1,4 @@
-"""User and wallet helper backed by the formal SQLite schema."""
+"""User and wallet helper backed by the formal database schema."""
 
 import hashlib
 
