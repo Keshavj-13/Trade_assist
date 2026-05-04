@@ -5,6 +5,7 @@ News fetching and FinBERT sentiment analysis.
 import time
 import os
 import requests
+from datetime import datetime
 from typing import Dict, List
 
 from infra.logging import log
@@ -16,13 +17,31 @@ _NEWS_TTL_SECONDS = int(os.environ.get("NEWS_TTL_SECONDS", 45 * 60))
 _NEWS_PAGE_SIZE = 5
 
 
+def _to_epoch(value) -> float:
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, datetime):
+        return float(value.timestamp())
+    if isinstance(value, str):
+        raw = value.strip()
+        if raw.endswith("Z"):
+            raw = f"{raw[:-1]}+00:00"
+        try:
+            return float(datetime.fromisoformat(raw).timestamp())
+        except ValueError:
+            return 0.0
+    return 0.0
+
+
 def _cache_from_db(symbol: str):
     rows = fetch_news_cache(symbol)
     if not rows:
         return None
     headlines = [row["headline"] for row in rows if row["headline"]]
     fetched_at = max((row["fetched_at"] or 0) for row in rows)
-    entry = {"ts": fetched_at, "headlines": headlines}
+    entry = {"ts": _to_epoch(fetched_at), "headlines": headlines}
     _news_cache[symbol] = entry
     return entry
 
