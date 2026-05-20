@@ -1,51 +1,87 @@
-"""Compatibility launcher for fin_assist.
+"""CLI launcher for predictor-centric fin_assist runtime.
 
-Provides a small CLI to run a single analysis or start one of the
-long-running service components. Defaults to one-shot analysis.
+By default this CLI runs predictor inference once and keeps other operational
+modes inactive unless explicitly enabled.
 """
 
-import sys
-import os
-import argparse
+from __future__ import annotations
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import argparse
+import os
 
 from infra.logging import setup_logging
 from service.database import init_db
 from service.runner import run_once
 
-def _run_once():
+
+def _non_predictor_enabled() -> bool:
+    """Return whether legacy non-predictor runtime modes are enabled."""
+
+    return os.environ.get("FIN_ASSIST_ENABLE_NON_PREDICTOR", "0") == "1"
+
+
+def _persistence_enabled() -> bool:
+    """Return whether persistence side effects are enabled."""
+
+    return os.environ.get("FIN_ASSIST_ENABLE_PERSISTENCE", "0") == "1"
+
+
+def _maybe_init_db() -> None:
+    """Initialize DB only when persistence is explicitly enabled."""
+
+    if _persistence_enabled():
+        init_db()
+
+
+def _run_once() -> None:
     setup_logging()
-    init_db()
+    _maybe_init_db()
     run_once()
 
 
-def _run_daemon():
+def _run_daemon() -> None:
     setup_logging()
-    init_db()
+    _maybe_init_db()
     from service.daemon import run_forever
+
     run_forever()
 
 
-def _run_scheduler():
+def _run_scheduler() -> None:
     setup_logging()
-    init_db()
+    _maybe_init_db()
     from service.scheduler import market_scheduler_loop
+
     market_scheduler_loop()
 
 
-def _run_telegram():
+def _run_telegram() -> None:
     setup_logging()
-    init_db()
+    _maybe_init_db()
     from service.telegram_bot import telegram_listener_loop
+
     telegram_listener_loop()
 
 
-def main():
-    p = argparse.ArgumentParser(prog="market_assistant")
-    p.add_argument("mode", nargs="?", choices=["once", "daemon", "scheduler", "telegram"], default="once",
-                   help="Mode to run: 'once' runs analysis once; 'daemon' runs full daemon; 'scheduler' runs scheduler; 'telegram' runs telegram listener")
-    args = p.parse_args()
+def main() -> None:
+    """Parse CLI args and run requested mode."""
+
+    allowed_modes = ["once"]
+    if _non_predictor_enabled():
+        allowed_modes.extend(["daemon", "scheduler", "telegram"])
+
+    parser = argparse.ArgumentParser(prog="market_assistant")
+    parser.add_argument(
+        "mode",
+        nargs="?",
+        choices=allowed_modes,
+        default="once",
+        help=(
+            "Mode to run. Default is 'once'. "
+            "Legacy modes require FIN_ASSIST_ENABLE_NON_PREDICTOR=1."
+        ),
+    )
+    args = parser.parse_args()
 
     if args.mode == "once":
         _run_once()
