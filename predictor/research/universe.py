@@ -62,3 +62,120 @@ def core_research_universe() -> Tuple[str, ...]:
 def test_fixture_universe() -> Tuple[str, ...]:
     """Return symbols with CSV test fixtures available."""
     return ("INFY_NS_1d", "TCS_NS_1d", "RELIANCE_NS_1d", "HDFCBANK_NS_1d")
+
+
+# ---------------------------------------------------------------------------
+# Cross-asset universe additions (yfinance, exchange_suffix="")
+# ---------------------------------------------------------------------------
+
+
+_GLOBAL_ETF_SYMBOLS: Tuple[str, ...] = (
+    # US equity
+    "SPY",   # S&P 500
+    "QQQ",   # NASDAQ 100
+    "IWM",   # Russell 2000
+    # International equity
+    "EEM",   # Emerging markets
+    "EFA",   # EAFE developed ex-US
+    # Fixed income
+    "TLT",   # 20+ yr US treasuries
+    "HYG",   # High yield corporate bonds
+    # Commodities
+    "GLD",   # Gold
+    "SLV",   # Silver
+    "USO",   # Oil
+)
+
+_COMMODITY_SYMBOLS: Tuple[str, ...] = (
+    "GLD",    # Gold
+    "SLV",    # Silver
+    "USO",    # Oil
+    "UNG",    # Natural gas
+    "PDBC",   # Diversified commodity
+    "DBA",    # Agriculture
+    "CPER",   # Copper
+)
+
+_FX_SYMBOLS: Tuple[str, ...] = (
+    "EURUSD=X",
+    "GBPUSD=X",
+    "USDJPY=X",
+    "AUDUSD=X",
+    "USDCAD=X",
+    "USDCHF=X",
+    "NZDUSD=X",
+)
+
+_INTERNATIONAL_EQUITY_SYMBOLS: Tuple[str, ...] = (
+    "EWJ",   # Japan
+    "EWG",   # Germany
+    "EWZ",   # Brazil
+    "FXI",   # China large-cap
+    "EWY",   # South Korea
+    "EWA",   # Australia
+    "INDA",  # India (broad, USD-denominated)
+)
+
+_DIVERSIFIED_RESEARCH_SYMBOLS: Tuple[str, ...] = (
+    # US equities
+    "SPY", "QQQ", "IWM",
+    # International equities
+    "EEM", "EWJ", "EWZ", "FXI",
+    # Bonds
+    "TLT", "HYG",
+    # Commodities
+    "GLD", "SLV", "USO",
+    # FX
+    "EURUSD=X", "GBPUSD=X", "USDJPY=X",
+    # Sector ETFs (US)
+    "XLK",   # Technology
+    "XLF",   # Financials
+    "XLE",   # Energy
+    "XLV",   # Healthcare
+    "XLY",   # Consumer discretionary
+)
+
+
+def global_etf_universe() -> Tuple[str, ...]:
+    """Return global ETF symbols for cross-asset research.
+
+    Use with YFinanceHistoricalDataSource(exchange_suffix="").
+    """
+    return _GLOBAL_ETF_SYMBOLS
+
+
+def commodity_universe() -> Tuple[str, ...]:
+    """Return commodity ETF symbols for research.
+
+    Use with YFinanceHistoricalDataSource(exchange_suffix="").
+    """
+    return _COMMODITY_SYMBOLS
+
+
+def fx_universe() -> Tuple[str, ...]:
+    """Return major FX pairs for research.
+
+    Use with YFinanceHistoricalDataSource(exchange_suffix="").
+    Symbols already include the yfinance =X suffix.
+    """
+    return _FX_SYMBOLS
+
+
+def international_equity_universe() -> Tuple[str, ...]:
+    """Return international equity ETF symbols for research.
+
+    Use with YFinanceHistoricalDataSource(exchange_suffix="").
+    """
+    return _INTERNATIONAL_EQUITY_SYMBOLS
+
+
+def diversified_research_universe() -> Tuple[str, ...]:
+    """Return a 20-symbol cross-asset basket for hypothesis testing.
+
+    Covers US equities, international equities, bonds, commodities,
+    FX, and sector ETFs. Designed for trend-following hypothesis testing
+    that requires broad asset diversity to find surviving strategies.
+
+    Use with YFinanceHistoricalDataSource(exchange_suffix="").
+    """
+    return _DIVERSIFIED_RESEARCH_SYMBOLS

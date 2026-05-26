@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Tuple
 
+from predictor.research.baselines import build_baseline_universe
+from predictor.research.hypotheses import build_hypothesis_universe
 from predictor.research.strategies import (
     DonchianBreakoutStrategy,
     KeltnerBreakoutStrategy,
@@ -138,3 +140,12 @@ def build_core_strategy_universe() -> Tuple[TradingStrategy, ...]:
         VolatilityBreakoutStrategy(lookback=20, atr_window=14, name="volatility_breakout"),
         RegimeSwitchingStrategy(volatility_window=20, trend_window=50, name="regime_switching"),
     )
+
+
+# Re-export for convenience — library.py is the single import point for strategy universes
+__all__ = [
+    "build_literature_strategy_universe",
+    "build_core_strategy_universe",
+    "build_baseline_universe",
+    "build_hypothesis_universe",
+]

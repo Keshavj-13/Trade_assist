@@ -46,15 +46,15 @@ def compare_strategies(
     rows: List[StrategyComparisonRow] = []
     for strategy in strategy_tuple:
         report = validate_strategy(frame, strategy, config=config)
-        oos = report.walk_forward_aggregate.metrics
+        raw = report.resolved_raw_metrics
         row = StrategyComparisonRow(
             strategy_name=report.strategy_name,
             is_valid=report.is_valid,
-            total_return=oos.total_return,
-            sharpe_ratio=oos.sharpe_ratio,
-            max_drawdown=oos.max_drawdown,
-            win_rate=oos.win_rate,
-            profit_factor=oos.profit_factor,
+            total_return=raw.total_return,
+            sharpe_ratio=raw.sharpe_ratio,
+            max_drawdown=raw.max_drawdown,
+            win_rate=raw.win_rate,
+            profit_factor=raw.profit_factor,
             in_sample_p_value=report.in_sample_permutation.p_value,
             walk_forward_p_value=report.walk_forward_permutation.p_value,
             walk_forward_stability=report.walk_forward_stability,

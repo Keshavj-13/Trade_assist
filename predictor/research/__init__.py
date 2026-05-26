@@ -21,7 +21,12 @@ from predictor.research.errors import (
     ResearchValidationError,
 )
 from predictor.research.harness import compare_strategies_across_symbols
-from predictor.research.library import build_literature_strategy_universe
+from predictor.research.library import (
+    build_literature_strategy_universe,
+    build_core_strategy_universe,
+    build_baseline_universe,
+    build_hypothesis_universe,
+)
 from predictor.research.types import (
     BacktestRun,
     MultiSymbolComparisonResult,
@@ -39,6 +44,123 @@ from predictor.research.validation import (
     build_walk_forward_splits,
     validate_strategy,
 )
+from predictor.research.baselines import (
+    BuyAndHoldStrategy,
+    ShortAndHoldStrategy,
+    RandomEntryFixedHoldStrategy,
+    SimpleMABaseline,
+    VolatilityTargetedHoldStrategy,
+)
+from predictor.research.calibration import (
+    FutureLeakStrategy,
+    PureRandomEntryStrategy,
+    MildPredictiveProcess,
+    CalibrationResult,
+    run_permutation_calibration,
+    print_calibration_report,
+)
+from predictor.research.visualization import (
+    plot_equity_curve,
+    plot_drawdown_curve,
+    plot_permutation_histogram,
+    plot_trade_return_distribution,
+    plot_rolling_sharpe,
+    plot_regime_overlay,
+    export_equity_to_json,
+    export_metrics_to_parquet,
+    plot_factor_cumulative_returns,
+    plot_ic_distribution,
+    plot_factor_regime_performance,
+)
+from predictor.research.hypotheses import (
+    GapFadeStrategy,
+    VolatilityCompressionBreakoutStrategy,
+    VolatilityExpansionStrategy,
+    RegimeFilteredTrendStrategy,
+)
+from predictor.research.experiment import (
+    ExperimentRecord,
+    build_experiment_record,
+    save_experiment,
+    load_experiment,
+)
+from predictor.research.universe import (
+    global_etf_universe,
+    commodity_universe,
+    fx_universe,
+    international_equity_universe,
+    diversified_research_universe,
+)
+from predictor.research.factors import (
+    BuyAndHoldBaselineFactor,
+    EqualWeightSelectionFactor,
+    Momentum20Factor,
+    PreviousDayReturnFactor,
+    RankingFactor,
+    RandomRankingFactor,
+    RollingBetaAdjustedStrengthFactor,
+    SectorRelativeStrengthFactor,
+    ShortTermMomentumFactor,
+    SimpleMomentumRankFactor,
+    MarketBenchmarkFactor,
+    PreviousDayWinnerContinuation,
+    PreviousDayLoserRebound,
+    SectorMomentumFactor,
+    OvernightGapFactor,
+    VolatilityRankFactor,
+    VolatilityCompressionFactor,
+    RelativeVolumeFactor,
+    ATRExpansionFactor,
+    build_factor_universe,
+)
+from predictor.research.ranking import (
+    IntradayExecutionAssumptions,
+    RankingMetrics,
+    compute_next_day_returns,
+    compute_daily_regimes,
+    evaluate_ranking,
+)
+from predictor.research.cross_sectional import (
+    CrossSectionalResearchConfig,
+    CrossSectionalPermutationResult,
+    CSWalkForwardFoldResult,
+    CrossSectionalValidationReport,
+    run_cross_sectional_backtest,
+    run_cross_sectional_permutation,
+    run_cross_sectional_permutation_on_panels,
+    run_cross_sectional_walk_forward,
+    validate_factor,
+)
+from predictor.research.ranking_baselines import build_ranking_baseline_universe
+from predictor.research.ranking_calibration import (
+    RankingCalibrationResult,
+    RankingCalibrationSuite,
+    build_synthetic_intraday_targets,
+    run_ranking_calibration_suite,
+)
+from predictor.research.ranking_diagnostics import (
+    export_ranking_diagnostics_json,
+    export_ranking_diagnostics_parquet,
+    plot_cumulative_top_k_return,
+    plot_factor_distributions,
+    plot_prediction_vs_realized,
+    plot_ranking_distribution,
+    plot_ranking_permutation_histogram,
+    plot_ranking_regime_overlay,
+    plot_rolling_ic,
+)
+from predictor.research.ranking_engine import (
+    DailyFeatureSnapshot,
+    DailyRanking,
+    RankingEngineResult,
+    build_daily_feature_snapshots,
+    evaluate_daily_rankings,
+    generate_daily_rankings,
+    rank_snapshot,
+    rankings_to_score_panel,
+    run_ranking_engine,
+)
+
 
 __all__ = [
     "BacktestRun",
@@ -62,6 +184,9 @@ __all__ = [
     "YFinanceHistoricalDataSource",
     "build_donchian_variant_universe",
     "build_literature_strategy_universe",
+    "build_core_strategy_universe",
+    "build_baseline_universe",
+    "build_hypothesis_universe",
     "build_strict_donchian_validation_config",
     "build_walk_forward_splits",
     "compare_strategies_across_symbols",
@@ -70,4 +195,108 @@ __all__ = [
     "select_stable_donchian_rows",
     "validate_research_frame",
     "validate_strategy",
+    # Baselines
+    "BuyAndHoldStrategy",
+    "ShortAndHoldStrategy",
+    "RandomEntryFixedHoldStrategy",
+    "SimpleMABaseline",
+    "VolatilityTargetedHoldStrategy",
+    # Calibration
+    "FutureLeakStrategy",
+    "PureRandomEntryStrategy",
+    "MildPredictiveProcess",
+    "CalibrationResult",
+    "run_permutation_calibration",
+    "print_calibration_report",
+    # Visualization
+    "plot_equity_curve",
+    "plot_drawdown_curve",
+    "plot_permutation_histogram",
+    "plot_trade_return_distribution",
+    "plot_rolling_sharpe",
+    "plot_regime_overlay",
+    "export_equity_to_json",
+    "export_metrics_to_parquet",
+    "plot_factor_cumulative_returns",
+    "plot_ic_distribution",
+    "plot_factor_regime_performance",
+    # Hypotheses
+    "GapFadeStrategy",
+    "VolatilityCompressionBreakoutStrategy",
+    "VolatilityExpansionStrategy",
+    "RegimeFilteredTrendStrategy",
+    # Experiment
+    "ExperimentRecord",
+    "build_experiment_record",
+    "save_experiment",
+    "load_experiment",
+    # Universe
+    "global_etf_universe",
+    "commodity_universe",
+    "fx_universe",
+    "international_equity_universe",
+    "diversified_research_universe",
+    # Factors
+    "RankingFactor",
+    "RandomRankingFactor",
+    "BuyAndHoldBaselineFactor",
+    "EqualWeightSelectionFactor",
+    "SimpleMomentumRankFactor",
+    "VolatilityRankFactor",
+    "Momentum20Factor",
+    "MarketBenchmarkFactor",
+    "PreviousDayWinnerContinuation",
+    "PreviousDayReturnFactor",
+    "PreviousDayLoserRebound",
+    "SectorMomentumFactor",
+    "ShortTermMomentumFactor",
+    "SectorRelativeStrengthFactor",
+    "OvernightGapFactor",
+    "VolatilityCompressionFactor",
+    "RelativeVolumeFactor",
+    "ATRExpansionFactor",
+    "RollingBetaAdjustedStrengthFactor",
+    "build_factor_universe",
+    "build_ranking_baseline_universe",
+    # Ranking
+    "IntradayExecutionAssumptions",
+    "RankingMetrics",
+    "compute_next_day_returns",
+    "compute_daily_regimes",
+    "evaluate_ranking",
+    # Ranking Engine
+    "DailyFeatureSnapshot",
+    "DailyRanking",
+    "RankingEngineResult",
+    "build_daily_feature_snapshots",
+    "rank_snapshot",
+    "generate_daily_rankings",
+    "rankings_to_score_panel",
+    "evaluate_daily_rankings",
+    "run_ranking_engine",
+    # Cross Sectional Orchestration
+    "CrossSectionalResearchConfig",
+    "CrossSectionalPermutationResult",
+    "CSWalkForwardFoldResult",
+    "CrossSectionalValidationReport",
+    "run_cross_sectional_backtest",
+    "run_cross_sectional_permutation",
+    "run_cross_sectional_permutation_on_panels",
+    "run_cross_sectional_walk_forward",
+    "validate_factor",
+    # Ranking calibration
+    "RankingCalibrationResult",
+    "RankingCalibrationSuite",
+    "build_synthetic_intraday_targets",
+    "run_ranking_calibration_suite",
+    # Ranking diagnostics
+    "plot_ranking_distribution",
+    "plot_factor_distributions",
+    "plot_prediction_vs_realized",
+    "plot_ranking_permutation_histogram",
+    "plot_rolling_ic",
+    "plot_cumulative_top_k_return",
+    "plot_ranking_regime_overlay",
+    "export_ranking_diagnostics_json",
+    "export_ranking_diagnostics_parquet",
 ]

@@ -10,6 +10,12 @@ import pandas as pd
 
 from predictor.research.backtest import backtest_strategy
 from predictor.research.data import validate_research_frame
+from predictor.research.diagnostics import (
+    PipelineStage,
+    assert_impossible_states,
+    decompose_positions,
+    log_pipeline_stage,
+)
 from predictor.research.errors import ResearchInputError, ResearchValidationError
 from predictor.research.metrics import compute_performance_metrics
 from predictor.research.permutation import block_permute_ohlcv, run_permutation_test
@@ -22,6 +28,25 @@ from predictor.research.types import (
     WalkForwardFoldResult,
     WalkForwardSplit,
 )
+
+
+def _zero_performance_metrics() -> PerformanceMetrics:
+    """Return an explicit zeroed metrics object for rejected validation views."""
+    return PerformanceMetrics(
+        total_return=0.0,
+        sharpe_ratio=0.0,
+        max_drawdown=0.0,
+        win_rate=0.0,
+        profit_factor=0.0,
+        trade_count=0,
+        exposure_time=0.0,
+        avg_holding_period=0.0,
+        expectancy=0.0,
+        avg_win=0.0,
+        avg_loss=0.0,
+        largest_win=0.0,
+        largest_loss=0.0,
+    )
 
 
 @dataclass(frozen=True)
@@ -190,8 +215,18 @@ def validate_strategy(
     *,
     config: ResearchValidationConfig,
 ) -> StrategyValidationReport:
-    """Run the mandatory four-stage validation framework for one strategy."""
+    """Run the mandatory four-stage validation framework for one strategy.
 
+    Pipeline stages executed in order:
+    1. LOAD_DATA          — validate and normalise the OHLCV frame
+    2. GENERATE_POSITIONS — call strategy.generate_positions()
+    3. CONSTRUCT_BACKTEST — build returns / equity curve
+    4. COMPUTE_IS_METRIC  — compute in-sample Sharpe ratio
+    5. RUN_IS_PERMUTATIONS — block-permutation null test on IS metric
+    6. RUN_WALKFORWARD    — walk-forward fold backtests (skipped if IS fails)
+    7. RUN_WF_PERMUTATIONS — permutation test on stitched OOS returns
+    """
+    log_pipeline_stage(PipelineStage.LOAD_DATA)
     minimum_rows = max(3, config.train_window + config.test_window)
     validated = validate_research_frame(
         frame,
@@ -199,12 +234,30 @@ def validate_strategy(
         min_rows=minimum_rows,
     )
 
+    log_pipeline_stage(PipelineStage.GENERATE_POSITIONS)
+    # Decompose positions for impossible-state checking (signals → trades).
+    positions_raw = strategy.generate_positions(validated)
+    _decomp = decompose_positions(positions_raw)
+
+    log_pipeline_stage(PipelineStage.CONSTRUCT_BACKTEST)
     in_sample = backtest_strategy(
         validated,
         strategy,
         bars_per_year=config.bars_per_year,
         transaction_cost_bps=config.transaction_cost_bps,
     )
+
+    # Verify signal → trade chain integrity.
+    equity_end = float(in_sample.equity_curve.iloc[-1]) if not in_sample.equity_curve.empty else 1.0
+    assert_impossible_states(
+        positions_nonzero=_decomp.positions_nonzero,
+        entries_generated=_decomp.entries_generated,
+        trade_count=in_sample.metrics.trade_count,
+        equity_end=equity_end,
+        strategy_name=getattr(strategy, "name", "STRATEGY"),
+    )
+
+    log_pipeline_stage(PipelineStage.COMPUTE_IS_METRIC)
     in_sample_permutation = run_permutation_test(
         frame=validated,
         observed_statistic=in_sample.metrics.sharpe_ratio,
@@ -214,15 +267,20 @@ def validate_strategy(
         seed=config.random_seed + 1_001,
         p_value_threshold=config.p_value_threshold,
     )
+    log_pipeline_stage(PipelineStage.RUN_IS_PERMUTATIONS)
 
     is_valid = True
     fail_reasons: List[str] = []
+    raw_metrics = in_sample.metrics
+    validated_metrics = _zero_performance_metrics()
+    rejection_reason: str | None = None
     if not in_sample_permutation.passes:
         fail_reasons.append("in_sample_permutation_failed")
         is_valid = False
 
-    # Short-circuit logic to skip expensive WF if in-sample permutation fails
+    # Short-circuit: skip expensive WF stages when IS permutation fails.
     if is_valid:
+        log_pipeline_stage(PipelineStage.RUN_WALKFORWARD)
         splits = build_walk_forward_splits(
             total_rows=len(validated),
             train_size=config.train_window,
@@ -261,6 +319,7 @@ def validate_strategy(
             [fold.run for fold in folds],
             bars_per_year=config.bars_per_year,
         )
+        log_pipeline_stage(PipelineStage.RUN_WF_PERMUTATIONS)
         walk_forward_permutation = _walk_forward_permutation(
             validated=validated,
             strategy=strategy,
@@ -290,6 +349,12 @@ def validate_strategy(
         ):
             fail_reasons.append("walk_forward_sharpe_below_threshold")
         is_valid = not fail_reasons
+        raw_metrics = walk_forward_aggregate.metrics
+        if is_valid:
+            validated_metrics = walk_forward_aggregate.metrics
+        else:
+            validated_metrics = _zero_performance_metrics()
+            rejection_reason = fail_reasons[0]
     else:
         # Dummy values for skipped steps
         folds = []
@@ -298,13 +363,16 @@ def validate_strategy(
             returns=pd.Series(dtype=float),
             positions=pd.Series(dtype=float),
             equity_curve=pd.Series(dtype=float),
-            metrics=PerformanceMetrics(total_return=0.0, sharpe_ratio=0.0, max_drawdown=0.0, win_rate=0.0, profit_factor=0.0, trade_count=0, exposure_time=0.0, avg_holding_period=0.0, expectancy=0.0, avg_win=0.0, avg_loss=0.0, largest_win=0.0, largest_loss=0.0)
+            metrics=_zero_performance_metrics(),
         )
         walk_forward_permutation = PermutationTestResult(
             observed_statistic=0.0, null_distribution=(), p_value=1.0, passes=False
         )
         stability = 0.0
         fold_pass_rate = 0.0
+        raw_metrics = in_sample.metrics
+        validated_metrics = _zero_performance_metrics()
+        rejection_reason = "in_sample_permutation_failed"
 
     return StrategyValidationReport(
         strategy_name=getattr(strategy, "name", "STRATEGY"),
@@ -317,4 +385,7 @@ def validate_strategy(
         walk_forward_fold_pass_rate=fold_pass_rate,
         is_valid=is_valid,
         fail_reasons=tuple(fail_reasons),
+        raw_metrics=raw_metrics,
+        validated_metrics=validated_metrics,
+        rejection_reason=rejection_reason,
     )

@@ -73,23 +73,20 @@ def _build_strategy_row(
     symbol_count: int,
 ) -> MultiSymbolStrategyRow:
     """Aggregate per-symbol validation reports into one ranked row."""
-    total_returns = np.asarray(
-        [r.walk_forward_aggregate.metrics.total_return for r in reports]
-    )
-    sharpes = np.asarray([r.walk_forward_aggregate.metrics.sharpe_ratio for r in reports])
-    drawdowns = np.asarray([r.walk_forward_aggregate.metrics.max_drawdown for r in reports])
-    win_rates = np.asarray([r.walk_forward_aggregate.metrics.win_rate for r in reports])
-    profit_factors = np.asarray(
-        [r.walk_forward_aggregate.metrics.profit_factor for r in reports]
-    )
+    raw = [r.resolved_raw_metrics for r in reports]
+    total_returns = np.asarray([m.total_return for m in raw])
+    sharpes = np.asarray([m.sharpe_ratio for m in raw])
+    drawdowns = np.asarray([m.max_drawdown for m in raw])
+    win_rates = np.asarray([m.win_rate for m in raw])
+    profit_factors = np.asarray([m.profit_factor for m in raw])
     is_p = np.asarray([r.in_sample_permutation.p_value for r in reports])
     wf_p = np.asarray([r.walk_forward_permutation.p_value for r in reports])
     stabilities = np.asarray([r.walk_forward_stability for r in reports])
     pass_rate = float(np.mean([1.0 if r.is_valid else 0.0 for r in reports]))
 
-    t_counts = np.asarray([r.walk_forward_aggregate.metrics.trade_count for r in reports])
-    t_holds = np.asarray([r.walk_forward_aggregate.metrics.avg_holding_period for r in reports])
-    t_exps = np.asarray([r.walk_forward_aggregate.metrics.expectancy for r in reports])
+    t_counts = np.asarray([m.trade_count for m in raw])
+    t_holds = np.asarray([m.avg_holding_period for m in raw])
+    t_exps = np.asarray([m.expectancy for m in raw])
 
     return MultiSymbolStrategyRow(
         strategy_name=strategy.name,
@@ -135,15 +132,18 @@ def compare_strategies_across_symbols(
     symbol_tuple = _validate_symbols(symbols)
     strategy_tuple = to_strategy_tuple(strategies)
     rows: List[MultiSymbolStrategyRow] = []
+    all_reports: List[Tuple[str, str, StrategyValidationReport]] = []
 
     for strategy in strategy_tuple:
         reports: List[StrategyValidationReport] = []
         for symbol in symbol_tuple:
             frame = data_source.fetch_ohlcv(symbol)
-            reports.append(validate_strategy(frame, strategy, config=config))
+            report = validate_strategy(frame, strategy, config=config)
+            reports.append(report)
+            all_reports.append((strategy.name, symbol, report))
         rows.append(_build_strategy_row(strategy, reports, len(symbol_tuple)))
 
-    return MultiSymbolComparisonResult(rows=_rank_rows(rows))
+    return MultiSymbolComparisonResult(rows=_rank_rows(rows), reports=tuple(all_reports))
 
 
 def _fetch_all_symbols(
@@ -317,8 +317,9 @@ def run_research(
             continue
         rows.append(_build_strategy_row(strategy, reports, len(symbol_tuple)))
 
+    all_reports = tuple(raw_robustness)
     ranked = _rank_rows(rows)
-    comparison = MultiSymbolComparisonResult(rows=ranked)
+    comparison = MultiSymbolComparisonResult(rows=ranked, reports=all_reports)
 
     # Step 4: dominance pruning on ranked rows
     pruning = prune_dominated_strategies(ranked)
@@ -330,4 +331,5 @@ def run_research(
         symbol_robustness=robustness_rows,
         data_availability=availability,
         pruning=pruning,
+        reports=all_reports,
     )

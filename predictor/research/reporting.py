@@ -20,15 +20,15 @@ def build_symbol_robustness_rows(
     """Build per-symbol robustness rows from (strategy_name, symbol, report) triples."""
     rows: List[SymbolRobustnessRow] = []
     for strategy_name, symbol, report in reports:
-        oos = report.walk_forward_aggregate.metrics
+        raw = report.resolved_raw_metrics
         rows.append(
             SymbolRobustnessRow(
                 strategy_name=strategy_name,
                 symbol=symbol,
                 is_valid=report.is_valid,
                 fail_reasons=report.fail_reasons,
-                sharpe_ratio=oos.sharpe_ratio,
-                max_drawdown=oos.max_drawdown,
+                sharpe_ratio=raw.sharpe_ratio,
+                max_drawdown=raw.max_drawdown,
                 walk_forward_stability=report.walk_forward_stability,
             )
         )

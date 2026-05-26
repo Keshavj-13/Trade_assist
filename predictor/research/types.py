@@ -82,6 +82,23 @@ class StrategyValidationReport:
     walk_forward_fold_pass_rate: float
     is_valid: bool
     fail_reasons: Tuple[str, ...] = field(default_factory=tuple)
+    raw_metrics: PerformanceMetrics | None = None
+    validated_metrics: PerformanceMetrics | None = None
+    rejection_reason: str | None = None
+
+    @property
+    def resolved_raw_metrics(self) -> PerformanceMetrics:
+        """Return raw behavior metrics, defaulting to in-sample metrics."""
+        if self.raw_metrics is not None:
+            return self.raw_metrics
+        return self.in_sample.metrics
+
+    @property
+    def resolved_validated_metrics(self) -> PerformanceMetrics:
+        """Return validated metrics, defaulting to walk-forward aggregate metrics."""
+        if self.validated_metrics is not None:
+            return self.validated_metrics
+        return self.walk_forward_aggregate.metrics
 
 
 @dataclass(frozen=True)
@@ -135,6 +152,7 @@ class MultiSymbolComparisonResult:
     """Research harness output across symbols and strategies."""
 
     rows: Tuple[MultiSymbolStrategyRow, ...]
+    reports: Tuple[Tuple[str, str, StrategyValidationReport], ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -205,3 +223,4 @@ class ResearchRunResult:
     symbol_robustness: Tuple[SymbolRobustnessRow, ...]
     data_availability: Tuple[DataAvailabilityReport, ...]
     pruning: PruningResult
+    reports: Tuple[Tuple[str, str, StrategyValidationReport], ...] = field(default_factory=tuple)
